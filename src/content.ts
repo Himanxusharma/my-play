@@ -3,10 +3,16 @@ const customWindow = window as Window & {
   isRepeatEnabled?: boolean;
   videoInterval?: number;
   cleanup?: () => void;
+  skipStart?: number;
+  skipEnd?: number;
 };
 
 let isRepeatEnabled = false;
+let skipStart = 0;
+let skipEnd = 0;
 customWindow.isRepeatEnabled = isRepeatEnabled;
+customWindow.skipStart = skipStart;
+customWindow.skipEnd = skipEnd;
 
 let currentVideo: HTMLVideoElement | null = null;
 let videoObserver: MutationObserver | null = null;
@@ -45,16 +51,41 @@ function handleVideoEnd() {
     console.log('Video ended, sending message to background script');
     retryCount = 0;
     isReplaying = true;
+    
+    // Ensure we're at the correct start position before replaying
+    if (currentVideo) {
+      currentVideo.currentTime = skipStart;
+      // Add a small delay to ensure the video has time to seek
+      setTimeout(() => {
+        currentVideo?.play().catch(error => {
+          console.error('Error playing video:', error);
+        });
+        isReplaying = false; // Reset replay state after starting playback
+      }, 100);
+    }
+    
     sendVideoEndedMessage();
   }
 }
 
 // Function to handle time updates for more reliable end detection
 function handleTimeUpdate() {
-  if (!isRepeatEnabled || isReplaying || !currentVideo) return;
+  if (!isRepeatEnabled || !currentVideo) return;
   
-  // Check if we're very close to the end (within 0.5 seconds)
-  if (currentVideo.currentTime >= currentVideo.duration - 0.5) {
+  // Check if we need to skip to start position
+  if (currentVideo.currentTime < skipStart) {
+    currentVideo.currentTime = skipStart;
+  }
+  
+  // Check if we're very close to the end (accounting for skipEnd)
+  const effectiveEnd = currentVideo.duration - skipEnd;
+  if (currentVideo.currentTime >= effectiveEnd) {
+    console.log('Reached effective end:', {
+      currentTime: currentVideo.currentTime,
+      duration: currentVideo.duration,
+      skipEnd: skipEnd,
+      effectiveEnd: effectiveEnd
+    });
     handleVideoEnd();
   }
 }
@@ -95,11 +126,30 @@ function setupVideoListener(video: HTMLVideoElement | null) {
     currentVideo.removeEventListener('timeupdate', handleTimeUpdate);
   }
   
+  currentVideo = video;
+  
   if (isRepeatEnabled) {
     try {
       // Add both ended and timeupdate listeners for more reliable end detection
       video.addEventListener('ended', handleVideoEnd);
       video.addEventListener('timeupdate', handleTimeUpdate);
+      
+      // Set initial time if needed
+      if (video.currentTime < skipStart) {
+        video.currentTime = skipStart;
+      }
+      
+      // Add seeking event listener to handle manual seeking
+      video.addEventListener('seeking', () => {
+        if (video.currentTime < skipStart) {
+          video.currentTime = skipStart;
+        }
+        const effectiveEnd = video.duration - skipEnd;
+        if (video.currentTime >= effectiveEnd) {
+          video.currentTime = skipStart;
+        }
+      });
+      
       console.log('Added video event listeners');
     } catch (error) {
       console.error('Error setting up video listeners:', error);
@@ -117,7 +167,6 @@ function monitorVideoChanges() {
   const video = document.querySelector('video');
   if (video && video !== currentVideo) {
     console.log('Found video element immediately');
-    currentVideo = video;
     setupVideoListener(video);
   }
 
@@ -127,7 +176,6 @@ function monitorVideoChanges() {
       const video = document.querySelector('video');
       if (video && video !== currentVideo) {
         console.log('New video element detected through observer');
-        currentVideo = video;
         setupVideoListener(video);
       }
     });
@@ -153,7 +201,6 @@ function initializeVideoMonitoring() {
       const video = document.querySelector('video');
       if (video && video !== currentVideo) {
         console.log('Found video element through interval check');
-        currentVideo = video;
         setupVideoListener(video);
       }
     } catch (error) {
@@ -168,7 +215,11 @@ chrome.runtime.onMessage.addListener((message) => {
     if (message.action === 'toggleRepeat') {
       console.log('Received toggle message:', message);
       isRepeatEnabled = message.enabled;
+      skipStart = message.skipStart || 0;
+      skipEnd = message.skipEnd || 0;
       customWindow.isRepeatEnabled = isRepeatEnabled;
+      customWindow.skipStart = skipStart;
+      customWindow.skipEnd = skipEnd;
       
       if (!isRepeatEnabled) {
         cleanup(); // Clean up if disabled
@@ -176,6 +227,25 @@ chrome.runtime.onMessage.addListener((message) => {
         const video = document.querySelector('video');
         setupVideoListener(video);
         monitorVideoChanges(); // Restart monitoring if enabled
+      }
+    } else if (message.action === 'updateSkipValues') {
+      console.log('Received skip update:', message);
+      skipStart = message.skipStart || 0;
+      skipEnd = message.skipEnd || 0;
+      customWindow.skipStart = skipStart;
+      customWindow.skipEnd = skipEnd;
+      
+      // Update current video if exists
+      if (currentVideo && isRepeatEnabled) {
+        // If current time is before skipStart, move to skipStart
+        if (currentVideo.currentTime < skipStart) {
+          currentVideo.currentTime = skipStart;
+        }
+        // If current time is after effective end, move to skipStart
+        const effectiveEnd = currentVideo.duration - skipEnd;
+        if (currentVideo.currentTime >= effectiveEnd) {
+          currentVideo.currentTime = skipStart;
+        }
       }
     }
   } catch (error) {
@@ -186,10 +256,14 @@ chrome.runtime.onMessage.addListener((message) => {
 
 // Initialize the state when the page loads
 try {
-  chrome.storage.sync.get(['repeatEnabled'], function(result) {
+  chrome.storage.sync.get(['repeatEnabled', 'skipStart', 'skipEnd'], function(result) {
     isRepeatEnabled = result.repeatEnabled || false;
+    skipStart = result.skipStart || 0;
+    skipEnd = result.skipEnd || 0;
     customWindow.isRepeatEnabled = isRepeatEnabled;
-    console.log('Initial repeat state:', isRepeatEnabled);
+    customWindow.skipStart = skipStart;
+    customWindow.skipEnd = skipEnd;
+    console.log('Initial state:', { isRepeatEnabled, skipStart, skipEnd });
     
     if (isRepeatEnabled) {
       // Initialize video monitoring

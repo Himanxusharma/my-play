@@ -43,7 +43,6 @@
       border-radius: 6px;
       transition: all 0.2s ease;
       cursor: pointer;
-      overflow: hidden;
     }
 
     .toggle-container:hover {
@@ -109,6 +108,83 @@
       color: #333;
     }
 
+    .settings {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .settings.visible {
+      max-height: 100px;
+    }
+
+    .settings-content {
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .setting-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .setting-label {
+      font-size: 12px;
+      color: #666;
+      flex: 1;
+    }
+
+    .setting-input {
+      width: 40px;
+      padding: 2px 4px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #333;
+      text-align: center;
+    }
+
+    .setting-input:focus {
+      outline: none;
+      border-color: #2ecc71;
+    }
+
+    .settings-toggle {
+      background: none;
+      border: none;
+      padding: 4px;
+      font-size: 11px;
+      color: #666;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+      margin-top: 4px;
+    }
+
+    .settings-toggle:hover {
+      color: #2ecc71;
+    }
+
+    .settings-icon {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.2s ease;
+    }
+
+    .settings-icon.rotated {
+      transform: rotate(180deg);
+    }
+
     .status-container {
       height: 0;
       overflow: hidden;
@@ -139,15 +215,35 @@
       <img src="icons/icon32.png" alt="My Play Logo" class="logo">
       <h2>My Play</h2>
     </div>
-    <label class="toggle-container">
-      <div class="toggle-content">
-        <div class="switch">
-          <input type="checkbox" id="repeatToggle">
-          <span class="slider"></span>
+    <div>
+      <label class="toggle-container">
+        <div class="toggle-content">
+          <div class="switch">
+            <input type="checkbox" id="repeatToggle">
+            <span class="slider"></span>
+          </div>
+          <span class="label">Repeat Video</span>
         </div>
-        <span class="label">Repeat Video</span>
+      </label>
+      <button class="settings-toggle" id="settingsToggle">
+        Skip Seconds
+        <svg class="settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M6 9l6 6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="settings" id="settings">
+        <div class="settings-content">
+          <div class="setting-row">
+            <label class="setting-label" for="skipStart">Skip from start</label>
+            <input type="number" id="skipStart" class="setting-input" min="0" max="600" value="0"> s
+          </div>
+          <div class="setting-row">
+            <label class="setting-label" for="skipEnd">Skip from end</label>
+            <input type="number" id="skipEnd" class="setting-input" min="0" max="600" value="0"> s
+          </div>
+        </div>
       </div>
-    </label>
+    </div>
     <div class="status-container" id="statusContainer">
       <div class="status" id="status"></div>
     </div>

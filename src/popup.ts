@@ -2,6 +2,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('repeatToggle') as HTMLInputElement;
   const status = document.getElementById('status');
   const statusContainer = document.getElementById('statusContainer');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settings = document.getElementById('settings');
+  const settingsIcon = settingsToggle?.querySelector('.settings-icon');
+  const skipStart = document.getElementById('skipStart') as HTMLInputElement;
+  const skipEnd = document.getElementById('skipEnd') as HTMLInputElement;
   let statusTimeout: number;
   
   // Function to ensure content script is loaded
@@ -48,16 +53,70 @@ document.addEventListener('DOMContentLoaded', () => {
         // Retry the toggle
         await chrome.tabs.sendMessage(tabId, {
           action: 'toggleRepeat',
-          enabled: toggle.checked
+          enabled: toggle.checked,
+          skipStart: parseInt(skipStart.value) || 0,
+          skipEnd: parseInt(skipEnd.value) || 0
         });
       }
     }, 1000);
   }
   
-  // Load the saved state
-  chrome.storage.sync.get(['repeatEnabled'], (result: { repeatEnabled?: boolean }) => {
+  // Function to validate and update skip values
+  function validateSkipValue(input: HTMLInputElement) {
+    let value = parseInt(input.value);
+    if (isNaN(value) || value < 0) value = 0;
+    if (value > 600) value = 600;
+    input.value = value.toString();
+    return value;
+  }
+
+  // Load saved settings
+  chrome.storage.sync.get(['repeatEnabled', 'skipStart', 'skipEnd'], (result) => {
     toggle.checked = result.repeatEnabled || false;
+    skipStart.value = (result.skipStart || 0).toString();
+    skipEnd.value = (result.skipEnd || 0).toString();
     updateStatus(result.repeatEnabled || false, false);
+  });
+
+  // Toggle settings visibility
+  if (settingsToggle && settings && settingsIcon) {
+    settingsToggle.addEventListener('click', () => {
+      settings.classList.toggle('visible');
+      settingsIcon.classList.toggle('rotated');
+    });
+  }
+
+  // Handle skip value changes
+  skipStart.addEventListener('change', async () => {
+    const value = validateSkipValue(skipStart);
+    chrome.storage.sync.set({ skipStart: value });
+    
+    if (toggle.checked) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'updateSkipValues',
+          skipStart: value,
+          skipEnd: parseInt(skipEnd.value) || 0
+        });
+      }
+    }
+  });
+
+  skipEnd.addEventListener('change', async () => {
+    const value = validateSkipValue(skipEnd);
+    chrome.storage.sync.set({ skipEnd: value });
+    
+    if (toggle.checked) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'updateSkipValues',
+          skipStart: parseInt(skipStart.value) || 0,
+          skipEnd: value
+        });
+      }
+    }
   });
 
   // Save the state when toggled
@@ -98,7 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         await chrome.tabs.sendMessage(tab.id, {
           action: 'toggleRepeat',
-          enabled: enabled
+          enabled: enabled,
+          skipStart: parseInt(skipStart.value) || 0,
+          skipEnd: parseInt(skipEnd.value) || 0
         });
       } catch (error) {
         console.error('Error sending message:', error);
