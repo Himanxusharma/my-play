@@ -7,7 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsIcon = settingsToggle?.querySelector('.settings-icon');
   const skipStart = document.getElementById('skipStart') as HTMLInputElement;
   const skipEnd = document.getElementById('skipEnd') as HTMLInputElement;
+  const infoIcon = document.getElementById('infoIcon');
+  const tooltip = document.getElementById('tooltip');
+  const mainContent = document.getElementById('mainContent');
+  const infoContent = document.getElementById('infoContent');
+  const backButton = document.getElementById('backButton');
   let statusTimeout: number;
+  let tooltipTimeout: number;
   
   // Function to ensure content script is loaded
   async function ensureContentScript(tabId: number): Promise<boolean> {
@@ -211,5 +217,59 @@ document.addEventListener('DOMContentLoaded', () => {
       status.classList.remove('visible');
       statusContainer.classList.remove('visible');
     }
+  }
+
+  // Handle info icon click
+  if (infoIcon && mainContent && infoContent) {
+    infoIcon.addEventListener('click', () => {
+      // If info content is already visible, hide it and show main content
+      if (!infoContent.classList.contains('hidden')) {
+        infoContent.classList.add('hidden');
+        mainContent.classList.remove('hidden');
+      } else {
+        // Otherwise, show info content and hide main content
+        mainContent.classList.add('hidden');
+        infoContent.classList.remove('hidden');
+      }
+    });
+  }
+
+  // Handle back button click
+  if (backButton && mainContent && infoContent) {
+    backButton.addEventListener('click', () => {
+      infoContent.classList.add('hidden');
+      mainContent.classList.remove('hidden');
+    });
+  }
+
+  // Handle info icon click
+  if (infoIcon && tooltip) {
+    infoIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      tooltip.classList.toggle('visible');
+      
+      // Hide tooltip after 5 seconds
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+      }
+      if (tooltip.classList.contains('visible')) {
+        tooltipTimeout = window.setTimeout(() => {
+          tooltip.classList.remove('visible');
+        }, 5000);
+      }
+    });
+
+    // Close tooltip when clicking anywhere else
+    document.addEventListener('click', () => {
+      tooltip.classList.remove('visible');
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+      }
+    });
+
+    // Prevent tooltip from closing when clicking inside it
+    tooltip.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
   }
 }); 

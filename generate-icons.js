@@ -1,21 +1,28 @@
 const sharp = require('sharp');
 const fs = require('fs');
-const path = require('path');
 
-const sizes = [16, 48, 128];
-const iconDir = path.join(__dirname, 'icons');
-
-// Create icons directory if it doesn't exist
-if (!fs.existsSync(iconDir)) {
-  fs.mkdirSync(iconDir);
+// Ensure dist directory exists
+if (!fs.existsSync('dist')) {
+  fs.mkdirSync('dist');
 }
 
-// Generate icons for each size
+// Ensure icons directory exists
+if (!fs.existsSync('dist/icons')) {
+  fs.mkdirSync('dist/icons');
+}
+
+// Generate icons in different sizes
+const sizes = [16, 32, 48, 128];
+
 sizes.forEach(size => {
-  sharp('icon.svg')
+  sharp('icons/icon.svg')
     .resize(size, size)
     .png()
-    .toFile(path.join(iconDir, `icon${size}.png`))
-    .then(() => console.log(`Generated ${size}x${size} icon`))
-    .catch(err => console.error(`Error generating ${size}x${size} icon:`, err));
+    .toFile(`dist/icons/icon${size}.png`)
+    .then(() => {
+      console.log(`Generated ${size}x${size} icon`);
+    })
+    .catch(err => {
+      console.error(`Error generating ${size}x${size} icon:`, err);
+    });
 }); 
